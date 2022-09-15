@@ -30,7 +30,7 @@ import random
 from amiibo import AmiiboDump, AmiiboMasterKey, crypto
 
 
-class AmiiConverter:
+class AmiiboConverter:
     """
     Takes a .bin, .nfc, or a raw amiibo-id as imput
     Option to randomize UID
@@ -545,7 +545,7 @@ def main():
         logging.basicConfig(level=logging.DEBUG)
     elif args.verbose >= 1:
         logging.basicConfig(level=logging.INFO)
-    tool = AmiiConverter()
+    tool = AmiiboConverter()
     tool.set_mode(args.mode)
     for argument in args.input:
         tool.set_input(argument)
