@@ -40,12 +40,11 @@ class AmiiConverter:
     """
 
     def __init__(self):
+        self.mode = []
         self.byte_data = b""
         self.extra_data = b""
         self.parsed_input = []
         self.output_folder = ""
-        self.read_extension = ""
-        self.save_extension = ""
         self.randomize_uid = False
         self.master_keys = self._check_for_keys()
 
@@ -81,11 +80,10 @@ class AmiiConverter:
             return False
         if save not in ["bin", "nfc"]:
             return False
-        self.read_extension = read
-        self.save_extension = save
+        self.mode = [read, save]
         return True
 
-    def read_file(self, input_path: str):
+    def read_file(self, input_path: str) -> bool:
         """
         Read a .bin or .nfc and return the encrypted byte values
 
@@ -93,7 +91,7 @@ class AmiiConverter:
         Appends zero-values if smaller, truncate if larger
 
         :param input_path: Path of file to read
-        :return: Encrypted byte values
+        :return: True False
         """
         self.byte_data = b""
         self.extra_data = b""
@@ -111,13 +109,15 @@ class AmiiConverter:
                 data = fb_r.read()
         else:
             data = self._build_from_amiiboid(input_path.strip())
-
+        if not data:
+            pass
+            #return False
         while len(data) < 540:
             data += bytes(1)
         self.byte_data = data[:540]
-
         if len(data) > 540:
             self.extra_data = data[540:]
+        return True
 
     def _assemble_nfc(self) -> str:
         """
@@ -323,20 +323,22 @@ class AmiiConverter:
                     if fail not in failed:
                         failed.append(fail)
             else:
-                self.read_file(file[0])
+                try:
+                    self.read_file(file[0])
+                except TypeError:
+                    failed.append("Missing decryption keys!")
+                    break
                 if self.randomize_uid:
                     try:
                         self._randomize_uid()
                     except crypto.AmiiboHMACTagError:
-                        failed.append(f"{file[0]}")
-                if self.save_extension == "bin":
+                        failed.append(f"Failed to randomize UID of {file[0]}!")
+                        continue
+                if self.mode[1] == "bin":
                     self._write_bin(file)
-                if self.save_extension == "nfc":
+                if self.mode[1] == "nfc":
                     self._write_nfc(file)
                 counter += 1
-        #if failed:
-        #    logging.info(f"Failed to randomize UID of {' '.join(failed)}")
-        #logging.info(f"Parsed {counter} files.")
         return [counter, failed]
 
     def _write_bin(self, parsed_data: list, truncate=False):
@@ -376,7 +378,7 @@ class AmiiConverter:
 
         :param source: Source of the data
         """
-        if self.read_extension == "id":
+        if self.mode[0] == "id":
             if os.path.isfile(source):
                 if os.path.splitext(source)[1] == ".txt":
                     with open(source, "rt", encoding="utf-8") as rt_r:
@@ -396,14 +398,14 @@ class AmiiConverter:
                     self.parsed_input.append([amiibo_id.strip(), name.strip()])
         else:
             if os.path.isfile(source):
-                if self.read_extension in os.path.splitext(source)[1]:
+                if self.mode[0] in os.path.splitext(source)[1]:
                     name = pathlib.Path(source).stem
                     self.parsed_input.append([source, name])
             else:
                 for path in os.listdir(source):
                     new_path = os.path.join(source, path)
                     if os.path.isfile(new_path):
-                        if self.read_extension in os.path.splitext(new_path)[1]:
+                        if self.mode[0] in os.path.splitext(new_path)[1]:
                             name = pathlib.Path(new_path).stem
                             self.parsed_input.append([new_path, name])
                     else:
@@ -431,13 +433,12 @@ class AmiiConverter:
         :param parsed_data: Parsed input values
         :return: Full path to store output
         """
-        if self.read_extension == "id":
+        if self.mode[0] == "id":
             filename = os.path.join(self.output_folder, parsed_data[1])
             if self.output_folder:
                 os.makedirs(self.output_folder, exist_ok=True)
             return filename
         path = os.path.split(parsed_data[0])[0]
-        #filename, extension = os.path.splitext(file)
         if self.output_folder:
             save_path = (
                 pathlib.PurePosixPath(self.output_folder)
@@ -522,10 +523,11 @@ def validate_arguments(args) -> bool:
             f"This will overwrite existing files in {args.output}, do you wish to continue?"
         ):
             return False
-    if (len(args.input) > 1) and (os.path.splitext(args.output)[1] in [".nfc", ".bin"]):
-        logging.basicConfig(level=logging.ERROR)
-        logging.error(f"Unable to write multiple inputs to a single file!")
-        return False
+    if args.output:
+        if (len(args.input) > 1) and (os.path.splitext(args.output)[1] in [".nfc", ".bin"]):
+            logging.basicConfig(level=logging.ERROR)
+            logging.error(f"Unable to write multiple inputs to a single file!")
+            return False
     modes = ["bin2bin", "bin2nfc", "id2bin", "id2nfc", "nfc2bin", "nfc2nfc"]
     if args.mode not in modes:
         logging.basicConfig(level=logging.ERROR)
@@ -565,7 +567,8 @@ def main():
     else:
         result = tool.write_files()
     if result[1]:
-        logging.info(f"Failed to randomize UID of {' '.join(result[1])}")
+        for error in result[1]:
+            logging.warning(error)
     logging.info(f"Saved {result[0]} files.")
     return True
 
