@@ -384,6 +384,8 @@ class AmiiboConverter:
                     with open(source, "rt", encoding="utf-8") as rt_r:
                         lines = rt_r.readlines()
                     for line in lines:
+                        if not line.strip():
+                            continue
                         try:
                             name, amiibo_id = line.split(":")
                         except ValueError:
