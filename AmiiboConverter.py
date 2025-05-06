@@ -28,6 +28,7 @@ import os
 import pathlib
 import random
 import re
+import json
 
 from amiibo import AmiiboDump, AmiiboMasterKey, crypto
 
@@ -45,6 +46,7 @@ class AmiiboConverter:
         self.mode = []
         self.byte_data = b""
         self.extra_data = b""
+        self.input_root = None
         self.parsed_input = []
         self.output_folder = ""
         self.randomize_uid = False
@@ -398,14 +400,39 @@ class AmiiboConverter:
     def set_input(self, source: str):
         """
         Recursively scans files and folders, and append source and names to
-        self.parsed_input. If mode is set to read from id, it looks for
-        a .txt-file, if not found it checks and parses the string as an Amiibo-id
+        self.parsed_input. If mode is set to read from id, it looks for a .json
+        or .txt-file, if not found it checks and parses the string as an Amiibo-id
 
         :param source: Source of the data
         """
+        if self.input_root is None:
+            if os.path.isfile(source):
+                self.input_root = pathlib.Path(source).parent.resolve()
+            else:
+                self.input_root = pathlib.Path(source).resolve()
         if self.mode[0] == "id":
             if os.path.isfile(source):
-                if os.path.splitext(source)[1] == ".txt":
+                ext = os.path.splitext(source)[1]
+                if ext == ".json":
+                    with open(source, "rt", encoding="utf-8") as jf_r:
+                        data = json.load(jf_r)
+                    # Database
+                    if "amiibos" in data:
+                        for amiiboid, details in data["amiibos"].items():
+                            name = details.get("name", amiiboid)
+                            self.parsed_input.append([amiiboid.strip().replace("0x", ""), name.strip()])
+                    # AmiiboAPI-style format
+                    elif "amiibo" in data:
+                        for entry in data["amiibo"]:
+                            head = entry.get("head")
+                            tail = entry.get("tail")
+                            name = entry.get("name")
+                            if head and tail and name:
+                                amiiboid = head + tail
+                                self.parsed_input.append([amiiboid.strip(), name.strip()])
+                    else:
+                        logging.warning("JSON file does not contain a recognized format.")
+                elif ext == ".txt":
                     with open(source, "rt", encoding="utf-8") as rt_r:
                         lines = rt_r.readlines()
                     for line in lines:
@@ -434,7 +461,7 @@ class AmiiboConverter:
                     if os.path.isfile(new_path):
                         if self.mode[0] in os.path.splitext(new_path)[1]:
                             name = pathlib.Path(new_path).stem
-                            self.parsed_input.append([new_path, name])
+                            self.parsed_input.append([str(pathlib.Path(new_path).resolve()), name])
                     else:
                         self.set_input(new_path)
 
@@ -452,31 +479,37 @@ class AmiiboConverter:
 
     def _get_save_path(self, parsed_data: list) -> str:
         """
-        Finds the full path of the file to write
-
-        Figures out where to store the new files based on values parsed to set_output
-        and names of files / amiiboid.
-
-        :param parsed_data: Parsed input values
-        :return: Full path to store output
+        Determines the full output path, preserving folder structure relative to input root.
         """
+        def safe_filename(name):
+            # Replace illegal characters with underscores
+            safe = re.sub(r"[\\/<>:\"|?*]", "_", name)
+            # Collapse multiple underscores into one
+            safe = re.sub(r"_+", "_", safe)
+            # Strip leading/trailing underscores, spaces, and dots
+            return safe.strip(" _.")
+
+        filename = safe_filename(parsed_data[1])
+
         if self.mode[0] == "id":
-            filename = os.path.join(self.output_folder, parsed_data[1])
-            if self.output_folder:
-                os.makedirs(self.output_folder, exist_ok=True)
-            return filename
-        path = os.path.split(parsed_data[0])[0]
+            output_dir = self.output_folder or "."
+            os.makedirs(output_dir, exist_ok=True)
+            return os.path.join(output_dir, filename)
+
+        source_path = pathlib.Path(parsed_data[0]).resolve()
+        source_dir = source_path.parent
+
         if self.output_folder:
-            save_path = (
-                pathlib.PurePosixPath(self.output_folder)
-                .joinpath(pathlib.Path(*pathlib.Path(path).parts[1:]))
-                .as_posix()
-            )
-            os.makedirs(save_path, exist_ok=True)
-            filename = os.path.join(path, parsed_data[1])
+            try:
+                relative_subfolder = source_dir.relative_to(self.input_root)
+            except ValueError:
+                relative_subfolder = pathlib.Path()  # No subfolder if not under input_root
+            output_dir = pathlib.Path(self.output_folder) / relative_subfolder
         else:
-            save_path = path
-        return os.path.join(save_path, parsed_data[1])  # , filename, extension
+            output_dir = source_dir
+
+        os.makedirs(output_dir, exist_ok=True)
+        return str(output_dir / filename)
 
 
 def confirm_prompt(question: str) -> bool:
@@ -494,7 +527,7 @@ def get_args():
         "-m",
         "--mode",
         required=True,
-        help="Mode to run; bin2bin, bin2nfc, id2bin, id2nfc, nfc2bin, or nfc2nfc.",
+        help="Mode to run; bin2bin, bin2nfc, id2bin, id2nfc, nfc2bin, nfc2nfc, json2bin or json2nfc.",
     )
     parser.add_argument(
         "-i",
@@ -555,7 +588,7 @@ def validate_arguments(args) -> bool:
             logging.basicConfig(level=logging.ERROR)
             logging.error(f"Unable to write multiple inputs to a single file!")
             return False
-    modes = ["bin2bin", "bin2nfc", "id2bin", "id2nfc", "nfc2bin", "nfc2nfc"]
+    modes = ["bin2bin", "bin2nfc", "id2bin", "id2nfc", "nfc2bin", "nfc2nfc", "json2bin", "json2nfc"]
     if args.mode not in modes:
         logging.basicConfig(level=logging.ERROR)
         logging.error(f"{args.mode} is not a valid mode. Supported: {', '.join(modes)}")
@@ -573,7 +606,7 @@ def main():
     elif args.verbose >= 1:
         logging.basicConfig(level=logging.INFO)
     tool = AmiiboConverter()
-    tool.set_mode(args.mode)
+    tool.set_mode(args.mode.replace("json", "id"))
     for argument in args.input:
         tool.set_input(argument)
     if not tool.parsed_input:
