@@ -1,4 +1,4 @@
-cffi==1.15.1
-cryptography==38.0.1
+cffi==2.0.0
+cryptography==46.0.3
 pyamiibo==0.2
-pycparser==2.21
+pycparser==2.23

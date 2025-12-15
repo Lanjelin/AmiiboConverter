@@ -30,7 +30,7 @@ When inputing amiibo ID, filename can be set by adding name and a semicolon befo
 
 ## What does it require?
 
-Python 3.8 or newer
+Python 3.10 or newer
 
 You need the libraries in `requirements.txt`, install them using something like `python -m pip install -r requirements.txt`
 
