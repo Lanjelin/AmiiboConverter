@@ -22,9 +22,9 @@ Run the script from the terminal, passing the following arguments:
 `-h` display the help text.
 
 **examples:**  
-`python AmiiboConverter.py -m bin2nfc -i bin -o nfc` will convert all .bin-files found in the folder ./bin, convert them to .nfc, and store them in a folder called ./nfc  
-`python AmiiboConverter.py -m id2bin -i id.txt -d 3` will take all the amiibo ID found in id.txt, and make 3 new .bin-files (with random UID) per ID found.
-`python AmiiboConverter.py -m json2nfc -i mario.json -o nfc -d 3` will take all the amiibo ID found in mario.json, and make 3 new .nfc-files (with random UID) per ID found.
+`amiibo-converter -m bin2nfc -i bin -o nfc` will convert all .bin-files found in the folder ./bin, convert them to .nfc, and store them in a folder called ./nfc  
+`amiibo-converter -m id2bin -i id.txt -d 3` will take all the amiibo ID found in id.txt, and make 3 new .bin-files (with random UID) per ID found.
+`amiibo-converter -m json2nfc -i mario.json -o nfc -d 3` will take all the amiibo ID found in mario.json, and make 3 new .nfc-files (with random UID) per ID found.
 
 When inputing amiibo ID, filename can be set by adding name and a semicolon before the ID. Like `Luigi:0x00010000...` or `Daisy:00130000037a..`, same goes for .txt-files, where one ID per line applies as well. If no name is added, the ID will be used as filename.
 
@@ -32,9 +32,24 @@ When inputing amiibo ID, filename can be set by adding name and a semicolon befo
 
 Python 3.10 or newer
 
-You need the libraries in `requirements.txt`, install them using something like `python -m pip install -r requirements.txt`
+### Install from PyPI
 
-For anything but pure bin-to-nfc / nfc-to-bin conversion, you need the correct decryption keys in the same folder as the script, these are files commonly called `unfixed-info.bin` and `locked-secret.bin`. A merged version of these files called `key_retail.bin` can also be used. These files are not provided.
+Install the latest release directly from PyPI:
+
+```sh
+python -m pip install amiibo-converter
+amiibo-converter -m bin2nfc -i bin -o nfc
+```
+
+This installs the bundled dependencies automatically.  
+
+You can also install a local checkout:
+
+```sh
+python -m pip install .
+```
+
+For anything but pure bin-to-nfc / nfc-to-bin conversion, you need the correct decryption keys in the same folder as you execute the script, these are files commonly called `unfixed-info.bin` and `locked-secret.bin`. A merged version of these files called `key_retail.bin` can also be used. These files are not provided.
 
 ## A small warning at the end!
 

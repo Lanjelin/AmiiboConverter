@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amiibo-converter"
+version = "0.2.0"
+description = "Command-line tool to convert, duplicate, and randomize amiibo dumps."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GNU General Public License v3.0" }
+authors = [
+  { name = "Lanjelin" }
+]
+keywords = ["amiibo", "nfc", "ntag", "converter", "tool"]
+classifiers = [
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Environment :: Console",
+  "Topic :: Utilities",
+]
+dependencies = [
+  "cffi==2.0.0",
+  "cryptography==46.0.5",
+  "pyamiibo==0.2",
+  "pycparser==3.0",
+]
+
+[project.scripts]
+amiibo-converter = "AmiiboConverter:main"
+
+[tool.setuptools]
+py-modules = ["AmiiboConverter"]
